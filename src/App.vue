@@ -46,13 +46,9 @@ export default {
         },
 
         // 开启实时通信消息服务
+        // 鉴权指令由 store 在连接建立后自动发送（断线重连也一样），这里不用再手动发
         async initIMServer() {
             await this.$store.dispatch("connectWebSocket");
-            const connection = JSON.stringify({
-                code: 100,
-                content: "Bearer " + localStorage.getItem('teri_token'),
-            });
-            this.$store.state.ws.send(connection);
         },
 
         // 关闭websocket
@@ -87,19 +83,29 @@ export default {
 
     },
     async created() {
-        // 如果缓存中有token，尝试获取用户数据，并建立全双工通信
+        // 频道和热搜不依赖登录状态，优先加载，避免被后续阻塞
+        this.getChannels();
+        this.getHotSearch();
+
+        // 优先用本地 user 缓存恢复登录态，避免页面初次渲染时短暂显示"未登录"
+        const cachedUser = localStorage.getItem("teri_user");
+        if (cachedUser) {
+            this.$store.commit("updateUser", JSON.parse(cachedUser));
+            this.$store.commit("updateIsLogin", true);
+        }
+
+        // 异步请求后端校正登录态（含 token 校验、刷新用户信息）
+        //   成功：用最新的 user 数据覆盖缓存
+        //   失败：仅后端明确"未登录"时才会清掉 token + user 缓存；网络异常等情况会保留登录态
         if (localStorage.getItem("teri_token")) {
             await this.$store.dispatch("getPersonalInfo");
         }
-        // 有可能上面获取信息时token过期就清掉了 所以这里再做个存在判断
         if (localStorage.getItem("teri_token")) {
             this.$store.dispatch("getMsgUnread");
-            await this.initIMServer();
-            await this.getFavorites();
-            await this.getLikeAndDisLikeComment();
+            this.initIMServer().catch(() => {});
+            this.getFavorites().catch(() => {});
+            this.getLikeAndDisLikeComment().catch(() => {});
         }
-        this.getChannels();
-        this.getHotSearch();
     },
     mounted() {
         window.addEventListener('beforeunload', this.closeIMWebSocket);    // beforeunload 事件监听标签页关闭

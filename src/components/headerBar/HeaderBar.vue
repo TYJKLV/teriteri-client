@@ -500,7 +500,7 @@
                     this.openNewPage("/search");
                 } else {
                     // 否则就跳搜索详情页
-                    this.openNewPage(`/search/video?keyword=${input}`);
+                    this.openNewPage(`/search/video?keyword=${encodeURIComponent(input)}`);
                 }
             },
 

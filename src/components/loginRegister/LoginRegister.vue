@@ -43,6 +43,7 @@ export default {
     data() {
         return {
             videoElement: null,
+            rafId: null,    // canvas动画的requestAnimationFrame id
             usernameLogin: "",
             passwordLogin: "",
             usernameRegister: "",
@@ -54,10 +55,11 @@ export default {
     mounted() {
         this.videoElement = this.$refs.loginVideo;
         this.init();
-        document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+        document.addEventListener('keydown', this.handleKeyboard);
     },
     beforeUnmount() {
-        document.removeEventListener('keydown', (e) => this.handleKeyboard(e));
+        document.removeEventListener('keydown', this.handleKeyboard);
+        cancelAnimationFrame(this.rafId);   // 停止canvas动画
     },
     methods: {
 
@@ -69,7 +71,7 @@ export default {
             this.videoElement.crossOrigin = "anonymous";    // 允许在不同域之间共享资源
 
             const playVideo = () => {
-                requestAnimationFrame(playVideo);   // 每一帧之间调用 playVideo 函数，实现连续播放
+                this.rafId = requestAnimationFrame(playVideo);   // 每一帧之间调用 playVideo 函数，实现连续播放
                 const { width, height } = ctx.canvas;
                 ctx.drawImage(this.videoElement, 0, 0, width, height);   // 从视频元素中绘制图像数据到画布上
                 const data = ctx.getImageData(0, 0, width, height).data;
@@ -142,11 +144,12 @@ export default {
             }
             if (result.data.code === 200) {
                 localStorage.setItem("teri_token", result.data.data.token); // 浏览器缓存token
+                localStorage.setItem("teri_user", JSON.stringify(result.data.data.user)); // 浏览器缓存user，避免刷新后短暂显示未登录
                 this.$store.commit("updateUser", result.data.data.user);    // 更新vuex中当前用户信息
-                await this.$store.dispatch("getMsgUnread");
-                await this.initIMServer();  // 开启即时通信websocket
-                await this.getFavorites();
-                await this.getLikeAndDisLikeComment();
+                this.$store.dispatch("getMsgUnread");
+                this.initIMServer().catch(() => {});    // 非阻塞，失败不影响登录
+                this.getFavorites().catch(() => {});
+                this.getLikeAndDisLikeComment().catch(() => {});
                 ElMessage.success(result.data.message);
                 this.$store.commit("updateIsLogin", true);  // 修改在线状态
                 this.$emit("loginSuccess"); // 触发父组件关闭登录框的回调
@@ -185,13 +188,9 @@ export default {
 
         
         // 开启实时通信消息服务
+        // 鉴权指令由 store 在连接建立后自动发送（断线重连也一样），这里不用再手动发
         async initIMServer() {
             await this.$store.dispatch("connectWebSocket");
-            const connection = JSON.stringify({
-                code: 100,
-                content: "Bearer " + localStorage.getItem('teri_token'),
-            });
-            this.$store.state.ws.send(connection);
         },
 
         // 获取当前用户的收藏夹列表

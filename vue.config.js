@@ -17,6 +17,8 @@ module.exports = defineConfig({
   // 用于在开发过程中快速启动一个本地开发服务器并提供静态文件服务、热更新、代理等功能
   devServer: {
     port: 8787, // 自定义端口
+    host: '0.0.0.0', // 允许局域网内其他设备访问（如手机）
+    allowedHosts: 'all', // 允许所有 Host 头，支持内网穿透（花生壳/ngrok）访问
     open: true, // 项目建成自动打开窗口
     proxy: {
       "/api": {
@@ -26,6 +28,20 @@ module.exports = defineConfig({
         pathRewrite: {
           "^/api": "" // 路径重写，去掉 /api 前缀
         }
+      },
+      // 弹幕 WebSocket 代理（端口 7070）
+      // 注意：路径必须精确为 "/ws/danmu"，不能用 "/ws"，否则会与 webpack-dev-server 的 HMR（默认路径 /ws）冲突，
+      // 导致 HMR 握手被错误代理到后端，被 Spring Security 拦截，返回 403
+      "/ws/danmu": {
+        target: "http://localhost:7070",
+        changeOrigin: true,
+        ws: true,
+      },
+      // IM 聊天 WebSocket 代理（端口 7071，Netty）
+      "/im": {
+        target: "http://localhost:7071",
+        changeOrigin: true,
+        ws: true,
       },
     },
     client: {

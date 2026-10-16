@@ -1,5 +1,5 @@
 <template>
-    <div class="carousel-index">
+    <div class="carousel-index" v-if="carousels.length > 0">
         <div class="carousel-container" :style="`background-color: ${color};`">
             <div
                 class="carousel-transform"
@@ -16,7 +16,7 @@
             </div>
             <div class="carousel-footer__left">
                 <div class="title"><span>{{ title }}</span></div>
-                <div class="page">
+                <div class="page" v-if="canRoll">
                     <div
                         class="point"
                         :class="index == current ? 'is-active' : ''"
@@ -26,7 +26,7 @@
                     ></div>
                 </div>
             </div>
-            <div class="carousel-footer__right">
+            <div class="carousel-footer__right" v-if="canRoll">
                 <button type="button" @click="preSlide()">
                     <i class="iconfont icon-zuojiantou"></i>
                 </button>
@@ -39,9 +39,10 @@
 </template>
 
 <script>
-    import carouselJson from 'assets/json/carousel.json';
-
-    let timer;  // 定时器
+    // 轮播图数据改为动态获取：从"已过审"视频里随机取最多 6 个，不再使用写死的 carousel.json
+    const COLOR_PALETTE = ['#ca8d6b', '#5894d4', '#836e61', '#728cb4', '#564e3e', '#724b50'];
+    const MAX_COUNT = 6;        // 轮播图数量上限
+    const MIN_ROLL_COUNT = 3;   // 组件滚动逻辑固定取下标 1、2，少于 3 张时只能静态展示
 
     export default {
         name: "CarouselIndex",
@@ -57,27 +58,74 @@
                 color: "",
                 // 标题
                 title: "",
+                // 定时器
+                timer: null,
             }
         },
+        computed: {
+            // 是否具备轮播条件（张数少于 MIN_ROLL_COUNT 时组件滚动逻辑不可用）
+            canRoll() {
+                return this.carousels.length >= MIN_ROLL_COUNT;
+            },
+        },
         methods: {
-            // 请求
-            getCarousels() {
-                this.carousels = carouselJson;
-                this.$store.commit("updateCarousels", this.carousels.slice());
+            // 请求：从已过审视频中随机取最多 MAX_COUNT 个，去重后组装成轮播数据
+            async getCarousels() {
+                let list = [];
+                try {
+                    const res = await this.$get("/video/random/visitor");
+                    const videos = res.data.data || [];
+                    const seen = new Set();     // 按 vid 去重
+                    for (const item of videos) {
+                        const video = item.video;
+                        // 跳过缺字段的脏数据 / 重复视频
+                        if (!video || !video.vid || !video.coverUrl || seen.has(video.vid)) continue;
+                        seen.add(video.vid);
+                        list.push({
+                            url: video.coverUrl,
+                            title: video.title,
+                            target: `/video/${video.vid}`,      // 点击跳转到对应视频
+                            color: COLOR_PALETTE[list.length % COLOR_PALETTE.length],
+                        });
+                        if (list.length >= MAX_COUNT) break;
+                    }
+                } catch (e) {
+                    // 请求失败则不展示轮播：不回退到写死的旧数据（封面可能已随撤稿被删）
+                    list = [];
+                }
+                this.carousels = list;
+                this.$store.commit("updateCarousels", list.slice());
+                this.initCarousel();
+            },
+
+            // 数据就绪后：初始化底色/标题与自动轮播；不足 MIN_ROLL_COUNT 张时退化为静态展示
+            initCarousel() {
+                if (this.carousels.length === 0) return;
+                if (!this.canRoll) {
+                    this.isRoll = 1;    // 直接展示第一张，不滚动
+                    this.current = 1;
+                    this.color = this.carousels[0].color;
+                    this.title = this.carousels[0].title;
+                    return;
+                }
+                this.color = this.carousels[1].color;
+                this.title = this.carousels[1].title;
+                this.startTimer();
             },
 
             async refreshTimer() {
-                clearTimeout(timer);
-                // console.log(timer, "秒过去了");
+                clearTimeout(this.timer);
+                // console.log(this.timer, "秒过去了");
                 await this.nextSlide();
                 this.startTimer();
             },
             startTimer() {
-                timer = setTimeout(this.nextSlide, 3100);   // 加上主函数的延时时长总共3.5秒换一张图
+                this.timer = setTimeout(this.nextSlide, 3100);   // 加上主函数的延时时长总共3.5秒换一张图
             },
 
             nextSlide() {
-                clearTimeout(timer);
+                if (!this.canRoll) return;      // 张数不足时不允许滚动
+                clearTimeout(this.timer);
                 // 开滚
                 this.isRoll = 2;
                 if (this.current < this.carousels.length) {
@@ -100,7 +148,8 @@
             },
 
             preSlide() {
-                clearTimeout(timer);
+                if (!this.canRoll) return;      // 张数不足时不允许滚动
+                clearTimeout(this.timer);
                 this.isRoll = 1;
                 if (this.current > 1) {
                     this.current --;
@@ -123,7 +172,7 @@
 
             changePoint(index) {
                 // 暂停自动滚动
-                clearTimeout(timer);
+                clearTimeout(this.timer);
                 this.current = index;
                 // 创建一个原数组的副本
                 let list = this.$store.state.carousels.slice();
@@ -154,13 +203,8 @@
         created() {
             this.getCarousels();
         },
-        mounted() {
-            this.startTimer();
-            this.color = this.carousels[1].color;
-            this.title = this.carousels[1].title;
-        },
-        beforeMount() {
-            clearTimeout(timer);
+        beforeUnmount() {
+            clearTimeout(this.timer);
         }
     }
 </script>

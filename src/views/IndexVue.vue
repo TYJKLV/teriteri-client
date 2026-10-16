@@ -338,6 +338,8 @@ export default {
             loadingMore: false,
             // 刷新次数
             refreshTime: 0,
+            // 随机推荐 Promise，用于 mounted 中等它完成
+            randomPromise: null,
         }
     },
     computed: {
@@ -354,9 +356,16 @@ export default {
             const res = await this.$get("/video/random/visitor");
             if (res.data.data) {
                 this.randomVideos = res.data.data;
-                this.loadingRandom = false;
+                // 将随机推荐的vid加入去重列表，避免累加推荐重复出现
+                this.randomVideos.forEach(item => {
+                    this.vids.push(item.video.vid);
+                });
             }
-            // console.log(this.randomVideos);
+            this.loadingRandom = false;
+            // 随机推荐完成后，触发一次滚动检查，让累加推荐有机会加载
+            if (this.el) {
+                await this.handleScroll();
+            }
         },
 
         // 获取游客累加推荐
@@ -444,7 +453,8 @@ export default {
             }
 
             // 当距离底部小于800且有更多数据时触发加载数据的函数
-            if (bottomDistance < 800 && this.hasMore && !this.loadingMore) {
+            // 随机推荐未完成时不加载累加，避免数据去重失效导致重复显示
+            if (bottomDistance < 800 && this.hasMore && !this.loadingMore && !this.loadingRandom) {
                 await this.getCumulativeVideos();
             }
         },
@@ -465,7 +475,7 @@ export default {
         },
     },
     created() {
-        this.getRandomVideos();
+        this.randomPromise = this.getRandomVideos();
     },
     async mounted() {
         // 初始化头图的监听器
@@ -475,9 +485,13 @@ export default {
         // 根据主体顶部的偏移量计算 header 的高度
         headerHight = document.querySelector(".main__layout").offsetTop;
         window.addEventListener('scroll', this.handleScroll);
+        // 等待随机推荐加载完成再进行累加，避免 loadingRandom 导致 while 循环空转
+        if (this.randomPromise) {
+            await this.randomPromise;
+        }
         // 初次挂载时执行一次，防止大屏情况下，视频数量不足以撑出滚动条
         await this.handleScroll();
-        while (bottomDistance < 800 && this.hasMore) {
+        while (bottomDistance < 800 && this.hasMore && !this.loadingMore) {
             await this.handleScroll();
         }
     },

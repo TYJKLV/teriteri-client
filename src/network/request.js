@@ -35,22 +35,17 @@ export function get(url, config) {
     },
     (err) => {
       console.log(err);
-      if (err.response.headers.message === 'not login') {
-        // 修改当前的登录状态
-        store.commit("initData");
-        // 关闭websocket
-        if (store.state.ws) {
-          store.state.ws.close();
-          store.commit('setWebSocket', null);
-        }
-        // 清除本地token缓存
-        localStorage.removeItem("teri_token");
+      // err.response 在网络错误或请求超时时是 undefined，直接取 headers 会抛异常掩盖真实错误
+      if (err.response && err.response.headers && err.response.headers.message === 'not login') {
+        // 登录失效：统一清理vuex状态、本地缓存（token与user成对清理）和长连接
+        store.dispatch("clearLoginState");
         ElMessage.error("请登录后查看");
         store.state.isLoading = false;
       } else {
         ElMessage.error("特丽丽被玩坏了(¯﹃¯)");
         store.state.isLoading = false;
       }
+      return Promise.reject(err);
     },
   );
 
@@ -110,22 +105,17 @@ export function post(url, data, headers) {
     },
     (err) => {
       console.log(err);
-      if (err.response.headers.message == 'not login') {
-        // 修改当前的登录状态
-        store.commit("initData");
-        // 关闭websocket
-        if (store.state.ws) {
-          store.state.ws.close();
-          store.commit('setWebSocket', null);
-        }
-        // 清除本地token缓存
-        localStorage.removeItem("teri_token");
+      // err.response 在网络错误或请求超时时是 undefined，直接取 headers 会抛异常掩盖真实错误
+      if (err.response && err.response.headers && err.response.headers.message == 'not login') {
+        // 登录失效：统一清理vuex状态、本地缓存（token与user成对清理）和长连接
+        store.dispatch("clearLoginState");
         ElMessage.error("请登录后查看");
         store.state.isLoading = false;
       } else {
         ElMessage.error("特丽丽被玩坏了(¯﹃¯)");
         store.state.isLoading = false;
       }
+      return Promise.reject(err);
     },
   );
 

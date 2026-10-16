@@ -36,6 +36,7 @@
 <script>
 import MessageLoading from './MessageLoading.vue';
 import { handleDateTime, emojiText } from '@/utils/utils.js';
+import { ElMessage } from 'element-plus';
 
 export default {
     name: "MessageList",
@@ -187,6 +188,11 @@ export default {
 
         // 撤回消息
         withdraw() {
+            // 长连接断开时 state.ws 为 null（重连期间），直接 send 会抛异常
+            if (!this.$store.state.ws) {
+                ElMessage.error("服务已断开，请稍后重试");
+                return;
+            }
             const context = {
                 code: 102,
                 id: this.msgId
@@ -206,7 +212,7 @@ export default {
             });
             if (res.data.code && res.data.code === 200) {
                 let chat = this.$store.state.chatList.find(item => item.user.uid === this.mid);
-                let index = chat.detail.list.findIndex(item => item.id);
+                let index = chat.detail.list.findIndex(item => item.id === this.msgId);
                 if (index !== -1) {
                     chat.detail.list.splice(index, 1);
                     this.msgId = -1;
@@ -229,6 +235,7 @@ export default {
     watch: {
         "mid"(curr) {
             let chat = this.$store.state.chatList.find(item => item.user.uid === curr);
+            if (!chat) return;  // 聊天列表中还没有该用户（例如直接通过URL进入），等chatList更新后再由下面的深度监听填充
             // 复制一份，防止指向同一个地址
             this.chat = JSON.parse(JSON.stringify(chat));
             // console.log("当前聊天：",this.chat);
@@ -239,6 +246,7 @@ export default {
             handler(curr) {
                 this.$nextTick(() => {
                     const currChat = curr.find(item => item.user.uid === this.mid);
+                    if (!currChat) return;
                     // console.log("深度监听到聊天有新消息：", currChat);
                     // 复制粘贴新的chat
                     this.chat = JSON.parse(JSON.stringify(currChat));

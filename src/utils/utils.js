@@ -2,17 +2,35 @@ import EmojiList from '@/assets/json/emoji.json';
 
 
 /**
+ * 将文本中的HTML特殊字符转义为实体，防止XSS
+ * @param {String} text 需要转义的文本
+ * @returns {String} 转义后的文本
+ */
+function escapeHtml(text) {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+
+/**
  * 将文本中的URL或其他可识别的链接转换为可点击的超链接
  * @param {String} text 需要识别的文本
  * @returns {String} 带有超链接a标签的文本
  */
 export function linkify(text) {
     if (text) {
+        // 先对整个文本进行HTML转义，防止XSS，转义不影响URL中的ASCII字符匹配
+        var escapedText = escapeHtml(text);
+
         // 匹配URL的正则表达式
         var urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#/%=~_|$?!:,.]*[A-Z0-9+&@#/%=~_|$])/gi;
 
         // 将匹配到的URL替换为带有链接的HTML
-        var linkedText = text.replace(urlRegex, function (url) {
+        var linkedText = escapedText.replace(urlRegex, function (url) {
             return '<a href="' + url + '" class="v-url" target="_blank">' + url + '</a>';
         });
 
@@ -30,9 +48,11 @@ export function linkify(text) {
  */
 export function emojiText(text) {
     if (text) {
+        // 先对整个文本进行HTML转义，防止XSS，转义不影响[表情]占位符的匹配
+        const escapedText = escapeHtml(text);
         // 匹配 [表情] 格式的字符串
         const regex = /\[(.*?)\]/g;
-        const replacedText = text.replace(regex, (match, p1) => {
+        const replacedText = escapedText.replace(regex, (match, p1) => {
             // 查找匹配的表情名称在 EmojiList 中的索引
             const emojiIndex = EmojiList.findIndex(emoji => emoji.name === `[${p1}]`);
 
@@ -60,10 +80,16 @@ export function emojiText(text) {
  * @param {String} inputString 要转换的文本
  */
 export function highlightKeyword(keyword, inputString) {
+    if (!inputString) return inputString;
+    // 先对整个文本进行HTML转义，防止XSS
+    const escapedString = escapeHtml(inputString);
+    if (!keyword) return escapedString;
+    // 关键词按同样的方式转义后，再转义正则元字符，保证与转义后的文本整词匹配且不会因元字符报错
+    const escapedKeyword = escapeHtml(keyword).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     // 使用正则表达式创建一个匹配关键词的模式
-    const regex = new RegExp(`(${keyword.split('').join('|')})`, 'gi');
+    const regex = new RegExp(`(${escapedKeyword})`, 'gi');
     // 使用字符串替换函数进行替换，添加高亮标签
-    return inputString.replace(regex, '<em class="suggest_high_light">$1</em>');
+    return escapedString.replace(regex, '<em class="suggest_high_light">$1</em>');
 }
 
 

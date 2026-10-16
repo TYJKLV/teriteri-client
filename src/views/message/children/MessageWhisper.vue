@@ -99,7 +99,7 @@ export default {
             if (Number(this.$route.params.mid) === uid) {
                 // 如果移除的是当前聊天 就打开第一个聊天
                 if (this.$store.state.chatList.length > 0) {
-                    this.changeChat(this.$store.state.chatList[0].chat.userId);
+                    this.changeChat(this.$store.state.chatList[0].chat.anotherId);
                 } else {
                     this.$store.state.chatId = -1;
                 }
@@ -134,7 +134,7 @@ export default {
         if (this.$route.path === '/message/whisper') {
             // 自动打开第一个聊天
             if (this.$store.state.chatList.length > 0) {
-                this.changeChat(this.$store.state.chatList[0].chat.userId);
+                this.changeChat(this.$store.state.chatList[0].chat.anotherId);
             }            
         } else {
             // 否则就是直接用url进入的/message/whisper/{mid}的子页面

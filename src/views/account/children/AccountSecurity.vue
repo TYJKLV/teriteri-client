@@ -61,6 +61,7 @@ export default {
             if (!this.enable || this.isLoading) return;
             if (this.newPassword !== this.confirmPassword) {
                 ElMessage.warning("两次输入的新密码不一致")
+                return;
             }
             this.isLoading = true;
             const formData = new FormData();

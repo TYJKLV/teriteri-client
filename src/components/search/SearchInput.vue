@@ -168,9 +168,9 @@ export default {
             } else {
                 // 否则就跳搜索详情页
                 if (this.$route.path.startsWith('/search/user')) {
-                    this.$router.push(`/search/user?keyword=${input}`);
+                    this.$router.push(`/search/user?keyword=${encodeURIComponent(input)}`);
                 } else {
-                    this.$router.push(`/search/video?keyword=${input}`);
+                    this.$router.push(`/search/video?keyword=${encodeURIComponent(input)}`);
                 }
             }
         },

@@ -89,8 +89,24 @@ export default {
         // 更新对方用户 以及缓存自己的id
         updateUser() {
             let i = this.$store.state.chatList.findIndex(item => item.user.uid === this.mid);
+            if (i === -1) {
+                // 聊天列表中找不到该用户（例如直接通过URL进入私聊页），回退为请求用户信息，避免白屏
+                this.getUserByMid();
+                this.myId = this.$store.state.user.uid;
+                return;
+            }
             this.user = this.$store.state.chatList[i].user;
-            this.myId = this.$store.state.chatList[i].chat.anotherId;
+            this.myId = this.$store.state.chatList[i].chat.userId;
+        },
+
+        // 根据uid获取用户信息（用于聊天列表中还没有该用户的情况）
+        async getUserByMid() {
+            const res = await this.$get("/user/info/get-one", {
+                params: { uid: this.mid },
+            });
+            if (res.data && res.data.data) {
+                this.user = res.data.data;
+            }
         },
 
         // 更新窗口在线状态

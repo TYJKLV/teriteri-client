@@ -1369,7 +1369,7 @@ export default {
         this.changeWindowSize();
         window.addEventListener('resize', this.changeWindowSize);
         window.addEventListener('resize', this.handleVideoResize);
-        document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+        document.addEventListener('keydown', this.handleKeyboard);
         // 监听 progress 事件，该事件在缓冲状态发生变化时触发
         // this.$refs.videoPlayer.addEventListener('progress', this.updateBufferingBar);
         // 默认播放音量不等于this.volume，所以挂载时更新同步一下音量
@@ -1380,8 +1380,9 @@ export default {
     },
     beforeUnmount() {
         window.removeEventListener('resize', this.changeWindowSize);
-        document.removeEventListener('keydown', (e) => this.handleKeyboard(e));
+        document.removeEventListener('keydown', this.handleKeyboard);
         window.removeEventListener('resize', this.handleVideoResize);
+        clearInterval(speedInterval);   // 清除更新缓冲网速的定时任务
     },
     watch: {
         "dmStyle.fontsize"() {

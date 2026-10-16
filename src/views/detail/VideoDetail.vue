@@ -378,6 +378,8 @@ export default {
     data() {
         return {
             socket: null,
+            // 标记websocket是否由组件卸载时主动关闭，用于区分主动销毁与意外断线
+            wsClosedByUnmount: false,
             playerSize: {
                 width: 704,
                 height: 442,
@@ -480,7 +482,7 @@ export default {
 
         // 初始化实时弹幕的websocket
         async initWebsocket() {
-            const wsBaseUrl = process.env.VUE_APP_WS_DANMU_URL;
+            const wsBaseUrl = `ws://${window.location.host}`;
             const socketUrl = `${wsBaseUrl}/ws/danmu/${this.$route.params.vid}`;
             if (this.socket != null) {
                 await this.socket.close();
@@ -494,6 +496,7 @@ export default {
         },
 
         async closeWebSocket() {
+            this.wsClosedByUnmount = true;  // 标记为主动关闭，避免close事件触发自动重连
             if (this.socket != null) {
                 await this.socket.close();
                 this.socket = null;
@@ -635,6 +638,7 @@ export default {
         // 处理websocket事件        
         handleWsClose() {
             // console.log("弹幕websocket信道关闭,请刷新页面重试");
+            if (this.wsClosedByUnmount) return; // 组件卸载时主动关闭的连接，不需要重连
             setTimeout(() => {
                 if (!this.socket) {
                     this.initWebsocket();    // 如果两秒后还未重连就手动重连
@@ -668,6 +672,10 @@ export default {
                 this.$nextTick(() => {
                     this.$store.state.openLogin = false;
                 });
+                return;
+            }
+            if (!this.socket || this.socket.readyState !== 1) {
+                ElMessage.error("弹幕服务未连接，请刷新页面重试");
                 return;
             }
             const dmJson = JSON.stringify({
